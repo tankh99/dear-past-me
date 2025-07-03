@@ -1,9 +1,26 @@
 import streamlit as st
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
 
-# Placeholder LLM function (replace with actual LLM API call as needed)
+load_dotenv()
+
+# Set your OpenRouter or DeepSeek API key here or via environment variable
+OPENAI_API_KEY = os.getenv("OPENROUTER_API_KEY", "your-openrouter-api-key")
+
+# Initialize OpenAI client
+client = OpenAI(
+    base_url='https://openrouter.ai/api/v1',
+    api_key=OPENAI_API_KEY,
+)
+
 def query_llm(prompt: str) -> str:
-    # For demonstration, just echo the prompt with a mock response
-    return f"LLM says: You said '{prompt}'"
+    # You can change the model to any available on OpenRouter (e.g., deepseek/deepseek-chat)
+    completion = client.chat.completions.create(
+        model="openai/gpt-4o-mini",  # or "deepseek/deepseek-chat", etc.
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return completion.choices[0].message.content
 
 st.title("💬 Custom LLM Chatbot")
 
