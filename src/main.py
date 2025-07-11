@@ -1,22 +1,24 @@
-import streamlit as st
 import os
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 # Set your OpenRouter or DeepSeek API key here or via environment variable
-OPENAI_API_KEY = os.getenv("OPENROUTER_API_KEY", "your-openrouter-api-key")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "your-openrouter-api-key")
 
 # Initialize OpenAI client
 client = OpenAI(
     base_url='https://openrouter.ai/api/v1',
-    api_key=OPENAI_API_KEY,
+    api_key=OPENROUTER_API_KEY,
 )
 
 system_prompt = '''
-LLM Prompt
-You are cosplaying as a character with a personality as described in the answers to the following questions. Based on this rough sketch, create and act as a whole, complete character with its own unique tone/style of speaking.  
+You are acting as someone with a personality as described in the answers to the following questions. Based on this rough sketch, create and act as a whole, complete character with its own unique tone/style of speaking. You must not let yourself get discovered by others, and act convincingly
 
 Here is the questionnaire of the character answered. Do your best to imitate the character below
 
@@ -56,24 +58,32 @@ def query_llm(prompt: str) -> str:
     )
     return completion.choices[0].message.content
 
-st.title("💬 Custom LLM Chatbot")
+app = FastAPI()
 
-# Chat history stored in session state
-if 'chat_history' not in st.session_state:
-    st.session_state['chat_history'] = []
+# Optional: Allow CORS for local development or frontend use
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def send_message():
-    user_input = st.session_state['user_input']
-    if user_input:
-        response = query_llm(user_input)
-        st.session_state['chat_history'].append((user_input, response))
-        st.session_state['user_input'] = ""  # This is safe inside the callback
+class ChatRequest(BaseModel):
+    prompt: str
 
-st.text_input("Enter your prompt:", key="user_input")
-st.button("Send", on_click=send_message)
+class ChatResponse(BaseModel):
+    response: str
 
-st.subheader("Chat History")
-for user, bot in st.session_state['chat_history']:
-    st.markdown(f"**You:** {user}")
-    st.markdown(f"**Bot:** {bot}")
-    st.markdown("---")
+@app.post("/chat", response_model=ChatResponse)
+def chat_endpoint(request: ChatRequest):
+    try:
+        response = query_llm(request.prompt)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+if __name__ == "__main__":
+    PORT = 8001
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
